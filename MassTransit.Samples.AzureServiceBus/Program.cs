@@ -6,31 +6,25 @@ namespace MassTransit.Samples.AzureServiceBus
 {
     class Program
     {
-        /* To get this Host value:
-         * 1. Navigate in a browser to portal.azure.com.
-         * 2. Navigate to the Azure Service Bus instance you have created for this example.
-         * 3. Under the 'Settings' submenu on the left of the screen, click on 'Shared Access Policies', which will have a small golden key icon next to it.
-         * 4. On the table being displayed in the middle of the screen, click on the policy item 'RootManageSharedAccessKey'.
-         * 5. Copy the 'Primary Connection String' shown on the left part of the screen and paste the value for public const string Host.
-         */
+        // 从 Azure Portal 上获得 ASB 的 connection string
         public const string Host = "INSERT-HOST-NAME-HERE";
-        
-        //The Topic and TopicSubscription will be created auto-magically by MassTransit if they don't exist.
-        //It's worth noting you can provide no names and MassTransit will create these using it's own naming conventions.
+
+        // topic 及 subscription name 都会由 MassTransit 自动创建
         public const string TopicName = "echo-example-topic";
         public const string TopicSubscriptionEndpoint = "echo-example-subscription";
 
         static async Task Main(string[] args)
         {
+            // 使用 ASB 来初始化 MassTransit bus，接收一个配置 ASB 的 delegate
             var bus = Bus.Factory.CreateUsingAzureServiceBus(ConfigureBus);
             await bus.StartAsync();
 
             Console.WriteLine("What message would you like to send?");
-            var messageToSend = Console.ReadLine();
+            var msg = Console.ReadLine();
 
             //Publish Message
             Console.WriteLine("Sending Message");
-            await bus.Publish(new EchoDataObject { Sent = messageToSend });
+            await bus.Publish(new EchoDataObject { Msg = msg });
             Console.WriteLine("Message Sent");
 
             //Wait for response
@@ -40,16 +34,14 @@ namespace MassTransit.Samples.AzureServiceBus
             await bus.StopAsync();
         }
 
-        /// <summary>
-        /// Configures the Azure Service Bus host instance with the topic and sets up a subscription consumer to retrieve a message from the topic.
-        /// </summary>
-        /// <param name="configurator">The MassTransit IServiceBusBusFactoryConfigurator configurator</param>
+        // 配置 MassTransit 的 transport provider，作为方法指针传给 MassTransit 的 bus factory
         private static void ConfigureBus(IServiceBusBusFactoryConfigurator configurator)
         {
             configurator.Host(Host);
+            // 通过类型参数指定 message type，以及该 message 对应的 topic name
             configurator.Message<EchoDataObject>(c => c.SetEntityName(TopicName));
+            // 指定该 message 对应的 subscription endpoint 以及 consumer
             configurator.SubscriptionEndpoint<EchoDataObject>(TopicSubscriptionEndpoint, e => e.Consumer<EchoConsumer>());
-
             Console.WriteLine("Bus Configured.");
         }
     }
